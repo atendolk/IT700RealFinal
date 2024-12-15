@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <br><br>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">Home</a>
+            <a class="navbar-brand" href="about.html">Personalized Recovery Plan</a>
+            <a class="navbar-brand" href="contact.html">Sign Up and Forum</a>
+            <a class="navbar-brand" href="pricing.html">Search Treatment Centers</a>
+            <a class="navbar-brand" href="faq.html">FAQ</a>
+        </div>
+    </nav>
+    <h1>Addiction Treatment Locator</h1>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 80vh;
+            width: 100%;
+        }
+
+        .search-container {
+            margin: 20px;
+            text-align: center;
+        }
+
+        .search-container input {
+            width: 70%;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .search-container button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+        }
+
+        .center {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        .center h3 {
+            margin: 0;
+        }
+
+        .center p {
+            margin: 5px 0;
+        }
+
+        .center a {
+            color: #007bff;
+            text-decoration: none;
+        }
+    </style>
+    
+</head>
+
+<body>
+    
+    <div class="search-container">
+        <input type="text" id="locationInput" placeholder="Enter your city (e.g., Austin, TX)">
+        <button onclick="searchLocation()">Search</button>
+    </div>
+    <div id="map"></div>
+    <div id="results"></div> <!-- Results container -->
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.4.0/axios.min.js"></script>
+    <script>
+        const API_KEY_OPENCAGE = "c9567156fd4b439a9e09a9ca8197f360"; // OpenCage API Key
+        const API_KEY_GOOGLE = "AIzaSyADS7Y6AmQ4ok65sVGC6XnDEV1_BRTk8fw"; // Replace with your Google API Key
+
+        // Initialize the map
+        const map = L.map('map').setView([40.7128, -74.0060], 13); // Default view: NYC
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let markers = [];
+        let centersData = []; // To hold the centers data for later use
+
+        // Clear all markers from the map
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+
+        // Geocode function using OpenCage API
+        async function geocodeCity(city) {
+            try {
+                const response = await axios.get(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(city)}&key=${API_KEY_OPENCAGE}`);
+                if (response.data.results.length > 0) {
+                    return response.data.results[0].geometry;
+                } else {
+                    console.error("No results found for the city.");
+                    return null;
+                }
+            } catch (error) {
+                console.error("Error during geocoding:", error);
+                return null;
+            }
+        }
+
+        // Search for addiction treatment centers using Google Places API
+        async function findTreatmentCenters(lat, lng) {
+            try {
+                const response = await axios.get(`https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=health&keyword=addiction&treatment&key=${API_KEY_GOOGLE}`);
+                console.log("Google Places API response:", response.data); // Log entire response to debug
+                if (response.data.status === "OK" && response.data.results.length > 0) {
+                    return response.data.results;
+                } else {
+                    console.error("No treatment centers found.");
+                    return [];
+                }
+            } catch (error) {
+                console.error("Error retrieving treatment centers:", error);
+                return [];
+            }
+        }
+
+        // Add markers for treatment centers and display them below the map
+        function addMarkers(centers) {
+            clearMarkers();
+            const resultsContainer = document.getElementById("results");
+            resultsContainer.innerHTML = ""; // Clear previous results
+            centersData = centers.slice(0, 20); // Store the first 20 centers
+
+            centersData.forEach((center, index) => {
+                const { lat, lng } = center.geometry.location;
+                const marker = L.marker([lat, lng]).addTo(map);
+
+                // Fetch detailed info (like phone number and website) using the Places API Place Details endpoint
+                getPlaceDetails(center.place_id).then(details => {
+                    const website = details.website ? `<br><strong>Website:</strong> <a href="${details.website}" target="_blank">${details.website}</a>` : '';
+                    const phone = details.formatted_phone_number ? `<br><strong>Phone:</strong> ${details.formatted_phone_number}` : '';
+
+                    // Add to the marker popup
+                    marker.bindPopup(`
+                        <b>${center.name}</b><br>
+                        ${center.vicinity}<br>
+                        ${website}
+                        ${phone}
+                    `);
+                });
+
+                markers.push(marker);
+
+                // Create a div for each treatment center
+                const centerDiv = document.createElement("div");
+                centerDiv.classList.add("center");
+                centerDiv.innerHTML = `
+                    <h3>${center.name}</h3>
+                    <p><strong>Address:</strong> ${center.vicinity}</p>
+                    <p><strong>Rating:</strong> ${center.rating ? center.rating : "N/A"}</p>
+                    ${center.website ? `<p><strong>Website:</strong> <a href="${center.website}" target="_blank">${center.website}</a></p>` : ''}
+                    ${center.formatted_phone_number ? `<p><strong>Phone:</strong> ${center.formatted_phone_number}</p>` : ''}
+                `;
+                centerDiv.addEventListener("click", () => centerClicked(index)); // Add click event
+                resultsContainer.appendChild(centerDiv);
+            });
+        }
+
+        // Function to get detailed information for a place
+        async function getPlaceDetails(placeId) {
+            try {
+                const response = await axios.get(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${API_KEY_GOOGLE}`);
+                const details = response.data.result;
+                return details;
+            } catch (error) {
+                console.error("Error retrieving place details:", error);
+                return {};
+            }
+        }
+
+        // Handle click on a treatment center from the list
+        function centerClicked(index) {
+            const center = centersData[index];
+            const { lat, lng } = center.geometry.location;
+
+            // Focus the map on the clicked center
+            map.setView([lat, lng], 15);
+
+            // Highlight the marker (using a red color)
+            markers.forEach(marker => marker.setIcon(L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2732/2732661.png', iconSize: [25, 41] }))); // Reset all markers
+            markers[index].setIcon(L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 41] })); // Highlight the clicked marker
+        }
+
+        // Search for a location and display addiction centers
+        async function searchLocation() {
+            const city = document.getElementById("locationInput").value;
+            if (!city) {
+                alert("Please enter a city.");
+                return;
+            }
+
+            // Get city coordinates
+            const coords = await geocodeCity(city);
+            if (!coords) {
+                alert("Could not find the city. Please try again.");
+                return;
+            }
+
+            map.setView([coords.lat, coords.lng], 13);
+
+            // Find addiction treatment centers nearby
+            const centers = await findTreatmentCenters(coords.lat, coords.lng);
+            if (centers.length > 0) {
+                addMarkers(centers); // Add centers to the map and list
+            } else {
+                alert("No addiction treatment centers found in this area.");
+            }
+        }
+    </script>
+</body>
+
+</html>
