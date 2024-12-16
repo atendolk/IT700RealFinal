@@ -121,8 +121,10 @@
         async function findTreatmentCenters(lat, lng) {
             try {
                 const response = await axios.get(`https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=health&keyword=addiction&treatment&key=${API_KEY_GOOGLE}`);
-                console.log("Google Places API response:", response.data); // Log entire response to debug
+                //console.log("Google Places API response:", response.data); // Log entire response to debug
                 if (response.data.status === "OK" && response.data.results.length > 0) {
+                    const {results} = response.data;
+                    
                     return response.data.results;
                 } else {
                     console.error("No treatment centers found.");
