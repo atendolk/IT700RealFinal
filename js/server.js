@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const mysql = require("mysql2/promise");
-
+const path = require("path"); 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -10,8 +10,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Temporary in-memory storage for posts (from server.js)
-let posts = [];
+// Serve static files (JavaScript, CSS) from the root directory
+app.use(express.static(__dirname));
 
 // Database connection pool (from serverpersonalize.js)
 const db = mysql.createPool({
@@ -41,10 +41,12 @@ app.post("/posts", (req, res) => {
     posts.push({ subject, message });
     res.status(200).send("Post created!");
 });
-// Handle root route (default page)
+
+// Handle root route to serve your main HTML page (index.html)
 app.get("/", (req, res) => {
-    res.send("Welcome to the API!"); // Or any message you prefer
+    res.sendFile(path.join(__dirname, 'index.html'));  // Adjust 'index.html' to your actual file name
 });
+
 // Get all posts
 app.get("/posts", (req, res) => {
     res.status(200).json(posts);
