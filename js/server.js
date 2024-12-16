@@ -2,7 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const mysql = require("mysql2/promise");
-const path = require("path"); 
+const path = require("path");
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -10,10 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Serve static files (JavaScript, CSS) from the root directory
-app.use(express.static(__dirname));
-
-// Database connection pool (from serverpersonalize.js)
+// Database connection pool
 const db = mysql.createPool({
     host: "localhost",
     user: "root",
@@ -21,9 +19,15 @@ const db = mysql.createPool({
     database: "forum_db",
 });
 
-// --- Routes from server.js ---
+// Serve static files (if any)
+app.use(express.static(path.join(__dirname, '..')));  // Serves files from the root folder
 
-// Registration endpoint
+// Handle root route (send index.html)
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
+// --- Routes for API ---
 app.post("/register", (req, res) => {
     const { firstName, lastName, email } = req.body;
     if (!firstName || !lastName || !email) {
@@ -32,32 +36,13 @@ app.post("/register", (req, res) => {
     res.status(200).send("Registration successful!");
 });
 
-// Post creation endpoint
-app.post("/posts", (req, res) => {
-    const { subject, message } = req.body;
-    if (!subject || !message) {
-        return res.status(400).send("Subject and message are required.");
-    }
-    posts.push({ subject, message });
-    res.status(200).send("Post created!");
-});
-
-// Handle root route to serve your main HTML page (index.html)
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));  // Adjust 'index.html' to your actual file name
-});
-
-// Get all posts
 app.get("/posts", (req, res) => {
     res.status(200).json(posts);
 });
 
-// --- Routes from serverpersonalize.js ---
-
-// Personalized recovery plan endpoint
+// --- Personalized recovery plan endpoint ---
 app.post("/api/personalize", async (req, res) => {
     const { addictionType, recoveryStage, goals } = req.body;
-
     const suggestions = generateSuggestions(recoveryStage);
 
     try {
