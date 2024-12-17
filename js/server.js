@@ -13,22 +13,25 @@ app.use(bodyParser.json());
 
 // Database connection pool
 const db = mysql.createPool({
-    host: "localhost",
-    user: "root",
-    password: "Mataji12apt!",
-    database: "forum_db",
+    host: process.env.DB_HOST || "localhost",
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASS || "Mataji12apt!", // Ensure this is secure in production
+    database: process.env.DB_NAME || "forum_db",
 });
 
-// Serve static files (if any)
-app.use(express.static(path.join(__dirname, '..')));  // Serves files from the root folder
+// Serve static files
+app.use(express.static(path.join(__dirname, "public"))); // Serve static files from 'public'
 
-// Handle root route (send index.html)
+// Root route
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
+    console.log("Serving index.html"); // Log root access
+    res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// --- Routes for API ---
+// --- API Routes ---
+// User Registration
 app.post("/register", (req, res) => {
+    console.log("Received registration request:", req.body);
     const { firstName, lastName, email } = req.body;
     if (!firstName || !lastName || !email) {
         return res.status(400).send("All fields are required.");
@@ -36,47 +39,71 @@ app.post("/register", (req, res) => {
     res.status(200).send("Registration successful!");
 });
 
-app.get("/posts", (req, res) => {
-    res.status(200).json(posts);
+// Fetch Posts (Forum)
+app.get("/posts", async (req, res) => {
+    console.log("Fetching posts...");
+    try {
+        const [posts] = await db.query("SELECT * FROM posts");
+        res.status(200).json(posts);
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+        res.status(500).send("Error retrieving posts.");
+    }
 });
 
-// --- Personalized recovery plan endpoint ---
-app.post("/api/personalize", async (req, res) => {
-    const { addictionType, recoveryStage, goals } = req.body;
-    const suggestions = generateSuggestions(recoveryStage);
+// Add New Post (Forum)
+app.post("/posts", async (req, res) => {
+    console.log("Received post request:", req.body);
+    const { subject, message } = req.body;
+    if (!subject || !message) {
+        return res.status(400).send("Subject and message are required.");
+    }
 
     try {
         const [result] = await db.query(
-            `INSERT INTO recovery_plans (user_id, addiction_type, recovery_stage, goals, suggestions)
-       VALUES (?, ?, ?, ?, ?)`,
-            [1, addictionType, recoveryStage, goals, JSON.stringify(suggestions)]
+            "INSERT INTO posts (subject, message) VALUES (?, ?)",
+            [subject, message]
         );
-
-        res.json({
-            id: result.insertId,
-            addictionType,
-            recoveryStage,
-            goals,
-            suggestions,
-        });
+        res.status(200).send("Post added successfully.");
     } catch (error) {
-        console.error("Database error:", error);
-        res.status(500).send("Failed to save recovery plan.");
+        console.error("Error adding post:", error);
+        res.status(500).send("Failed to add post.");
     }
 });
 
-// Suggestion generator function
-function generateSuggestions(stage) {
-    switch (stage) {
-        case "beginner":
-            return ["Join a support group", "Start journaling", "Attend weekly therapy sessions"];
-        case "intermediate":
-            return ["Consider part-time work or volunteering", "Join advanced therapy groups", "Explore hobbies"];
-        case "advanced":
-            return ["Mentor others in recovery", "Organize local support groups", "Build long-term career goals"];
-        default:
-            return ["Stay motivated!"];
+// Personalized Recovery Plan (about.html)
+app.post("/api/personalize", (req, res) => {
+    const { addictionType, recoveryStage, goals } = req.body;
+
+    if (!addictionType || !recoveryStage || !goals) {
+        return res.status(400).json({ error: "Missing required fields." });
     }
+
+    // Example logic for personalized plan
+    const suggestions = getRecoverySuggestions(addictionType, recoveryStage);
+    
+    const personalizedPlan = {
+        addictionType,
+        recoveryStage,
+        goals,
+        suggestions
+    };
+
+    res.status(200).json(personalizedPlan);
+});
+
+// Function to generate personalized recovery suggestions
+function getRecoverySuggestions(addictionType, recoveryStage) {
+    if (recoveryStage === "beginner") {
+        return [`Start with counseling for ${addictionType}`, "Join a support group", "Begin self-care practices"];
+    }
+    if (recoveryStage === "intermediate") {
+        return [`Try individual therapy for ${addictionType}`, "Focus on physical health and fitness", "Consider a sober coach"];
+    }
+    if (recoveryStage === "advanced") {
+        return [`Work on long-term relapse prevention strategies for ${addictionType}`, "Support others in recovery", "Strengthen mental health resilience"];
+    }
+    return ["Seek professional advice"];
 }
 
 // Start the server
