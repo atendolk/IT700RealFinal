@@ -20,12 +20,12 @@ const db = mysql.createPool({
 });
 
 // Serve static files
-app.use(express.static(path.join(__dirname, "public"))); // Serve static files from 'public'
+app.use(express.static(path.join(__dirname, '..'))); // Serve files from the root directory
+
 
 // Root route
 app.get("/", (req, res) => {
-    console.log("Serving index.html"); // Log root access
-    res.sendFile(path.join(__dirname, "public", "index.html"));
+    res.sendFile(path.join(__dirname, "..", "index.html")); // Serving index.html from the root
 });
 
 // --- API Routes ---
